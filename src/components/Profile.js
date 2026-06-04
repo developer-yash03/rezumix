@@ -163,16 +163,21 @@ const Profile = () => {
         }
     }, [router, session, status]);
 
-    // --- Validation logic ---
+    const [currentPasswordCheck, setCurrentPasswordCheck] = useState({ valid: null, loading: false, message: '' });
     const validation = useMemo(() => {
-        const isCurrentValid = passwordChange.currentPassword.length > 0;
+        const isCurrentEmpty = passwordChange.currentPassword.length === 0;
+        const isCurrentValid = !isCurrentEmpty && currentPasswordCheck.valid === true;
         const isNewValid = PASSWORD_RULES.every((c) => c.test(passwordChange.newPassword));
         const isConfirmValid = passwordChange.confirmPassword === passwordChange.newPassword && passwordChange.confirmPassword.length > 0;
 
         return {
             currentPassword: {
                 valid: isCurrentValid,
-                message: touched.currentPassword && !isCurrentValid ? "Current password is required" : ""
+                message: isCurrentEmpty
+                    ? "Current password is required"
+                    : currentPasswordCheck.valid === false
+                        ? currentPasswordCheck.message
+                        : ""
             },
             newPassword: {
                 valid: isNewValid,
@@ -182,14 +187,42 @@ const Profile = () => {
                 valid: isConfirmValid,
                 message: touched.confirmPassword && !isConfirmValid ? "New passwords do not match" : ""
             },
-            isFormValid: isCurrentValid && isNewValid && isConfirmValid
+            isFormValid: !isCurrentEmpty && isNewValid && isConfirmValid && currentPasswordCheck.valid === true
         };
-    }, [passwordChange, touched]);
+    }, [passwordChange, touched, currentPasswordCheck]);
 
+
+
+    // Reset validation state when the current password field changes (e.g., user clears it or edits it)
+    useEffect(() => {
+        // Avoid resetting while a verification request is in progress
+        if (!currentPasswordCheck.loading) {
+            setCurrentPasswordCheck({ valid: null, loading: false, message: '' });
+        }
+    }, [passwordChange.currentPassword]);
     const handleBlur = useCallback((field) => {
         setTouched((prev) => ({ ...prev, [field]: true }));
-    }, []);
-
+        if (field === 'currentPassword' && passwordChange.currentPassword.length > 0) {
+            // Verify current password against backend only if not already validated
+            if (currentPasswordCheck.valid === null) {
+                const verify = async () => {
+                    setCurrentPasswordCheck({ valid: null, loading: true, message: '' });
+                    try {
+                        await apiClient.updateProfile({
+                            currentPassword: passwordChange.currentPassword,
+                            newPassword: passwordChange.currentPassword,
+                            confirmPassword: passwordChange.currentPassword,
+                        });
+                        setCurrentPasswordCheck({ valid: true, loading: false, message: '' });
+                    } catch (err) {
+                        const backendMsg = err.response?.data?.errors?.find(e => e.field === 'currentPassword')?.messages?.[0] || 'Incorrect current password';
+                        setCurrentPasswordCheck({ valid: false, loading: false, message: backendMsg });
+                    }
+                };
+                verify();
+            }
+        }
+    }, [currentPasswordCheck.valid, passwordChange.currentPassword]);
     const handleChangePassword = async () => {
         // Mark all fields as touched to show errors if any
         setTouched({ currentPassword: true, newPassword: true, confirmPassword: true });
@@ -314,22 +347,27 @@ const Profile = () => {
                                                 placeholder="••••••••"
                                                 value={passwordChange.currentPassword}
                                                 onBlur={() => handleBlur("currentPassword")}
-                                                onChange={(e) => setPasswordChange({ ...passwordChange, currentPassword: e.target.value })}
-                                                className={`w-full bg-[#111] border rounded-xl py-3 pl-12 pr-20 text-white focus:outline-none focus:ring-1 transition-all placeholder:text-slate-600 ${
-                                                    touched.currentPassword && !validation.currentPassword.valid
-                                                        ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/50"
-                                                        : touched.currentPassword && validation.currentPassword.valid
-                                                        ? "border-yellow-500/30 focus:border-yellow-500/50 focus:ring-yellow-500/50"
-                                                        : "border-white/10 focus:border-indigo-500/50 focus:ring-indigo-500/50"
+                                                onChange={(e) => {
+                                                    const newVal = e.target.value;
+                                                    setPasswordChange({ ...passwordChange, currentPassword: newVal });
+                                                    // Reset validation state when user modifies the current password
+                                                    setCurrentPasswordCheck({ valid: null, loading: false, message: '' });
+                                                }}
+                                                className={`w-full bg-[#111] border rounded-xl py-3 pl-12 pr-28 text-white focus:outline-none focus:ring-1 transition-all placeholder:text-slate-600 ${
+                                                    touched.currentPassword && passwordChange.currentPassword.length === 0
+                                                         ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/50"
+                                                         : touched.currentPassword && currentPasswordCheck.valid === false
+                                                         ? "border-yellow-500/30 focus:border-yellow-500/50 focus:ring-yellow-500/50"
+                                                         : touched.currentPassword && currentPasswordCheck.valid === true
+                                                         ? "border-green-500/30 focus:border-green-500/50 focus:ring-green-500/50"
+                                                         : "border-white/10 focus:border-indigo-500/50 focus:ring-indigo-500/50"
                                                 }`}
                                             />
                                             {/* Show/Hide toggle */}
                                             <button
                                                 type="button"
                                                 onClick={() => setShowCurrentPassword((v) => !v)}
-                                                className={`absolute top-3.5 text-slate-500 hover:text-indigo-400 transition-colors focus:outline-none ${
-                                                    touched.currentPassword ? "right-12" : "right-4"
-                                                }`}
+className={`absolute top-3.5 text-slate-500 hover:text-indigo-400 transition-colors focus:outline-none right-4`}
                                                 aria-label={showCurrentPassword ? "Hide password" : "Show password"}
                                             >
                                                 {showCurrentPassword ? (
@@ -339,15 +377,17 @@ const Profile = () => {
                                                 )}
                                             </button>
                                             {/* Validation icon */}
-                                            {touched.currentPassword && (
-                                                <div className="absolute right-4 top-3.5">
-                                                    {validation.currentPassword.valid ? (
-                                                    <AlertTriangle className="w-5 h-5 text-yellow-400" />
-                                                    ) : (
-                                                        <AlertCircle className="w-5 h-5 text-red-400" />
-                                                    )}
-                                                </div>
-                                            )}
+                            {touched.currentPassword && (
+                              <div className="absolute top-3.5 right-12">
+                                {passwordChange.currentPassword.length === 0 ? (
+                                  <AlertCircle className="w-5 h-5 text-red-400" />
+                                ) : currentPasswordCheck.valid === false ? (
+                                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                                ) : currentPasswordCheck.valid === true ? (
+                                  <CheckCircle className="w-5 h-5 text-green-400" />
+                                ) : null}
+                              </div>
+                            )}
                                         </div>
                                         {touched.currentPassword && validation.currentPassword.message && (
                                             <p className="text-xs text-red-400 ml-1 flex items-center gap-1.5">
@@ -368,7 +408,7 @@ const Profile = () => {
                                                 value={passwordChange.newPassword}
                                                 onBlur={() => handleBlur("newPassword")}
                                                 onChange={(e) => setPasswordChange({ ...passwordChange, newPassword: e.target.value })}
-                                                className={`w-full bg-[#111] border rounded-xl py-3 pl-12 pr-20 text-white focus:outline-none focus:ring-1 transition-all placeholder:text-slate-600 ${
+                                                className={`w-full bg-[#111] border rounded-xl py-3 pl-12 pr-28 text-white focus:outline-none focus:ring-1 transition-all placeholder:text-slate-600 ${
                                                     touched.newPassword && !validation.newPassword.valid
                                                         ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/50"
                                                         : touched.newPassword && validation.newPassword.valid
@@ -380,9 +420,7 @@ const Profile = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowNewPassword((v) => !v)}
-                                                className={`absolute top-3.5 text-slate-500 hover:text-indigo-400 transition-colors focus:outline-none ${
-                                                    touched.newPassword ? "right-12" : "right-4"
-                                                }`}
+                                                className="absolute top-3.5 right-4 text-slate-500 hover:text-indigo-400 transition-colors focus:outline-none"
                                                 aria-label={showNewPassword ? "Hide password" : "Show password"}
                                             >
                                                 {showNewPassword ? (
@@ -393,7 +431,7 @@ const Profile = () => {
                                             </button>
                                             {/* Validation icon */}
                                             {touched.newPassword && (
-                                                <div className="absolute right-4 top-3.5">
+                                                <div className="absolute right-12 top-3.5">
                                                     {validation.newPassword.valid ? (
                                                         <CheckCircle className="w-5 h-5 text-green-400" />
                                                     ) : (
@@ -417,7 +455,7 @@ const Profile = () => {
                                                 value={passwordChange.confirmPassword}
                                                 onBlur={() => handleBlur("confirmPassword")}
                                                 onChange={(e) => setPasswordChange({ ...passwordChange, confirmPassword: e.target.value })}
-                                                className={`w-full bg-[#111] border rounded-xl py-3 pl-12 pr-20 text-white focus:outline-none focus:ring-1 transition-all placeholder:text-slate-600 ${
+                                                className={`w-full bg-[#111] border rounded-xl py-3 pl-12 pr-28 text-white focus:outline-none focus:ring-1 transition-all placeholder:text-slate-600 ${
                                                     touched.confirmPassword && !validation.confirmPassword.valid
                                                         ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/50"
                                                         : touched.confirmPassword && validation.confirmPassword.valid
@@ -429,9 +467,7 @@ const Profile = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowConfirmPassword((v) => !v)}
-                                                className={`absolute top-3.5 text-slate-500 hover:text-indigo-400 transition-colors focus:outline-none ${
-                                                    touched.confirmPassword ? "right-12" : "right-4"
-                                                }`}
+                                                className="absolute top-3.5 right-4 text-slate-500 hover:text-indigo-400 transition-colors focus:outline-none"
                                                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                                             >
                                                 {showConfirmPassword ? (
@@ -442,7 +478,7 @@ const Profile = () => {
                                             </button>
                                             {/* Validation icon */}
                                             {touched.confirmPassword && (
-                                                <div className="absolute right-4 top-3.5">
+                                                <div className="absolute right-12 top-3.5">
                                                     {validation.confirmPassword.valid ? (
                                                     <CheckCircle className="w-5 h-5 text-green-400" />
                                                     ) : (
