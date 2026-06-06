@@ -146,32 +146,7 @@ npm install
 
 ### 2. Create Environment File
 
-Create a `.env.example` file in the **root directory** with placeholder values (see the file for required variables).
-Then copy it to `.env.local` and fill in actual values:
-
-```bash
-cp .env.example .env.local
-```
-
-### Required variables in `.env.local`
-
-```env
-MONGODB_URI=your_mongodb_connection_string
-GEMINI_API_KEY=your_gemini_api_key
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your_nextauth_secret_32_chars_min
-JWT_SECRET=your_jwt_secret_32_chars_min
-```
-
-### Optional variables (add as needed)
-```env
-EMAIL_USER=your_email@example.com
-EMAIL_PASS=your_email_app_password
-```
-# Optional: Cloudinary (for resume file storage)
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+Create a `.env.example` file in the **root directory** with the required environment variables (see the file for details). Then copy it to a newly created `.env.local` for you local deployment and fill in the actual values.
 
 **⚠️ Security Note:** Never commit `.env.local` to version control. It's already in `.gitignore`.
 
