@@ -146,27 +146,32 @@ npm install
 
 ### 2. Create Environment File
 
-Create a `.env.local` file in the **root directory** with the following variables:
+Create a `.env.example` file in the **root directory** with placeholder values (see the file for required variables).
+Then copy it to `.env.local` and fill in actual values:
+
+```bash
+cp .env.example .env.local
+```
+
+### Required variables in `.env.local`
 
 ```env
-# MongoDB
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/rezumix
+MONGODB_URI=your_mongodb_connection_string
+GEMINI_API_KEY=your_gemini_api_key
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_nextauth_secret_32_chars_min
+JWT_SECRET=your_jwt_secret_32_chars_min
+```
 
-# Gemini API
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# JWT Authentication
-JWT_SECRET=your_super_secret_jwt_key_min_32_chars
-
-# Optional: Email Configuration (for future features)
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_app_password
-
+### Optional variables (add as needed)
+```env
+EMAIL_USER=your_email@example.com
+EMAIL_PASS=your_email_app_password
+```
 # Optional: Cloudinary (for resume file storage)
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
-```
 
 **⚠️ Security Note:** Never commit `.env.local` to version control. It's already in `.gitignore`.
 
